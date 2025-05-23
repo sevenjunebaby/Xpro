@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Camera Recorder UI</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #121212;
+      color: white;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+    #camera-container {
+      position: relative;
+      width: 100%;
+      max-width: 480px;
+      aspect-ratio: 3 / 4;
+      background-color: #000;
+      overflow: hidden;
+      border-radius: 12px;
+      box-shadow: 0 0 10px #000;
+    }
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .overlay {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      display: flex;
+      gap: 10px;
+    }
+    .indicator {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background-color: #444;
+      border: 2px solid #fff;
+      transition: background-color 0.3s;
+    }
+    #sound-indicator.active {
+      background-color: yellow;
+    }
+    #camera-indicator.active {
+      background-color: green;
+    }
+    #object-indicator.active {
+      background-color: red;
+    }
+    .controls {
+      margin-top: 20px;
+      display: flex;
+      gap: 20px;
+      align-items: center;
+    }
+    button {
+      padding: 10px 15px;
+      background-color: #1f1f1f;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      user-select: none;
+    }
+    #timer {
+      font-size: 20px;
+      font-weight: bold;
+      min-width: 60px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div id="camera-container">
+    <video id="video" autoplay muted playsinline></video>
+    <div class="overlay">
+      <div id="camera-indicator" class="indicator"></div>
+      <div id="sound-indicator" class="indicator"></div>
+      <div id="object-indicator" class="indicator"></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button id="switchCamera">Switch Camera</button>
+    <div id="timer">00:00</div>
+  </div>
+
+  <!-- Socket.IO -->
+  <script src="https://cdn.socket.io/4.3.2/socket.io.min.js"></script>
+  <script>
+    const socket = io();
+
+    // Update object detection indicator from backend
+    socket.on('object_detection', data => {
+      document.getElementById('object-indicator').classList.toggle('active', data.detected);
+    });
+
+    // Update camera indicator from backend
+    socket.on('camera_status', data => {
+      document.getElementById('camera-indicator').classList.toggle('active', data.active);
+    });
+
+    // Simulate sound detection indicator
+    setInterval(() => {
+      const active = Math.random() > 0.7;
+      document.getElementById('sound-indicator').classList.toggle('active', active);
+    }, 1000);
+
+    // Timer logic
+    const timerDisplay = document.getElementById('timer');
+    let seconds = 0;
+    setInterval(() => {
+      seconds++;
+      const m = String(Math.floor(seconds / 60)).padStart(2, '0');
+      const s = String(seconds % 60).padStart(2, '0');
+      timerDisplay.textContent = `${m}:${s}`;
+    }, 1000);
+
+    // Switch camera button (frontend only: no backend camera switching)
+    document.getElementById('switchCamera').addEventListener('click', () => {
+      alert("Camera switching handled on backend - not implemented yet.");
+    });
+  </script>
+</body>
+</html>
