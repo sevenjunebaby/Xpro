@@ -1,54 +1,59 @@
-from flask import Flask, render_template
-from flask_socketio import SocketIO, emit
+from pathlib import Path
+from fastapi import FastAPI, WebSocket
+from fastapi.responses import HTMLResponse, StreamingResponse
 import cv2
 import torch
-import threading
-import time
+import asyncio
 
-app = Flask(__name__)
-socketio = SocketIO(app, cors_allowed_origins="*")
+app = FastAPI()
 
-# Load YOLOv5 model
-print("Loading YOLOv5 model...")
 model = torch.hub.load('ultralytics/yolov5', 'yolov5s', pretrained=True)
-print("Model loaded.")
 
-def detect_objects():
+detection_status = {"detected": False, "camera_active": False}
+
+@app.get("/")
+async def get_home():
+    html_path = Path(__file__).parent / "templates" / "index.html"
+    html_content = html_path.read_text()
+    return HTMLResponse(content=html_content, status_code=200)
+
+def gen_frames():
     cap = cv2.VideoCapture(0)
-    if not cap.isOpened():
-        print("Failed to open webcam.")
-        return
+    detection_status["camera_active"] = True
 
-    print("Starting detection loop...")
-    while True:
-        ret, frame = cap.read()
-        if not ret:
+    while cap.isOpened():
+        success, frame = cap.read()
+        if not success:
             break
 
-        # YOLOv5 expects RGB images
         results = model(frame)
-
-        # Detect if any objects found
         detected = len(results.xyxy[0]) > 0
+        detection_status["detected"] = detected
 
-        # Emit detection results
-        socketio.emit('object_detection', {'detected': detected})
+        for *xyxy, conf, cls in results.xyxy[0]:
+            label = model.names[int(cls)]
+            cv2.rectangle(frame, (int(xyxy[0]), int(xyxy[1])), (int(xyxy[2]), int(xyxy[3])), (0, 255, 0), 2)
+            cv2.putText(frame, label, (int(xyxy[0]), int(xyxy[1]) - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
-        # Emit camera active status (always true while streaming)
-        socketio.emit('camera_status', {'active': True})
+        ret, buffer = cv2.imencode('.jpg', frame)
+        frame_bytes = buffer.tobytes()
 
-        time.sleep(0.2)  # control detection rate ~5fps
-
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
     cap.release()
+    detection_status["camera_active"] = False
 
-@app.route('/')
-def index():
-    return render_template('index.html')
+@app.get("/video_feed")
+def video_feed():
+    return StreamingResponse(gen_frames(), media_type="multipart/x-mixed-replace; boundary=frame")
 
-if __name__ == '__main__':
-    # Run detection in background thread
-    thread = threading.Thread(target=detect_objects)
-    thread.daemon = True
-    thread.start()
-
-    socketio.run(app, host='0.0.0.0', port=5000)
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    while True:
+        await websocket.send_json({
+            "object_detection": {"detected": detection_status["detected"]},
+            "camera_status": {"active": detection_status["camera_active"]}
+        })
+        await asyncio.sleep(1)

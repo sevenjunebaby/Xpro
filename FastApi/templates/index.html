@@ -81,7 +81,7 @@
 </head>
 <body>
   <div id="camera-container">
-    <video id="video" autoplay muted playsinline></video>
+    <img id="video" src="/video_feed" alt="Camera video feed" style="width: 100%; height: 100%; object-fit: cover;" />
     <div class="overlay">
       <div id="camera-indicator" class="indicator"></div>
       <div id="sound-indicator" class="indicator"></div>
@@ -90,45 +90,39 @@
   </div>
 
   <div class="controls">
-    <button id="switchCamera">Switch Camera</button>
+    <button id="switchCamera" title="Not implemented yet">Switch Camera</button>
     <div id="timer">00:00</div>
   </div>
 
-  <!-- Socket.IO -->
-  <script src="https://cdn.socket.io/4.3.2/socket.io.min.js"></script>
   <script>
-    const socket = io();
+  const socket = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + "/ws");
 
-    // Update object detection indicator from backend
-    socket.on('object_detection', data => {
-      document.getElementById('object-indicator').classList.toggle('active', data.detected);
-    });
+  socket.onmessage = function(event) {
+    const data = JSON.parse(event.data);
+    document.getElementById('object-indicator').classList.toggle('active', data.object_detection.detected);
+    document.getElementById('camera-indicator').classList.toggle('active', data.camera_status.active);
+  };
 
-    // Update camera indicator from backend
-    socket.on('camera_status', data => {
-      document.getElementById('camera-indicator').classList.toggle('active', data.active);
-    });
+  // Simulate sound detection indicator
+  setInterval(() => {
+    const active = Math.random() > 0.7;
+    document.getElementById('sound-indicator').classList.toggle('active', active);
+  }, 1000);
 
-    // Simulate sound detection indicator
-    setInterval(() => {
-      const active = Math.random() > 0.7;
-      document.getElementById('sound-indicator').classList.toggle('active', active);
-    }, 1000);
+  // Timer logic
+  const timerDisplay = document.getElementById('timer');
+  let seconds = 0;
+  setInterval(() => {
+    seconds++;
+    const m = String(Math.floor(seconds / 60)).padStart(2, '0');
+    const s = String(seconds % 60).padStart(2, '0');
+    timerDisplay.textContent = `${m}:${s}`;
+  }, 1000);
 
-    // Timer logic
-    const timerDisplay = document.getElementById('timer');
-    let seconds = 0;
-    setInterval(() => {
-      seconds++;
-      const m = String(Math.floor(seconds / 60)).padStart(2, '0');
-      const s = String(seconds % 60).padStart(2, '0');
-      timerDisplay.textContent = `${m}:${s}`;
-    }, 1000);
-
-    // Switch camera button (frontend only: no backend camera switching)
-    document.getElementById('switchCamera').addEventListener('click', () => {
-      alert("Camera switching handled on backend - not implemented yet.");
-    });
+  // Switch camera button (frontend only)
+  document.getElementById('switchCamera').addEventListener('click', () => {
+    alert("Camera switching handled on backend - not implemented yet.");
+  });
   </script>
 </body>
 </html>
