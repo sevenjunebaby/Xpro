@@ -10,4 +10,4 @@ Smart Object Detection & Alert System
 
 
 # TEST
-![](test.png)
+![](Test.jpg)
